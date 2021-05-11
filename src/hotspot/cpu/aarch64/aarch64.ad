@@ -2497,6 +2497,7 @@ void Compile::reshape_address(AddPNode* addp) {
   }
 
 typedef void (MacroAssembler::* mem_insn)(Register Rt, const Address &adr);
+typedef void (MacroAssembler::* mem_insn2)(Register Rt, Register adr);
 typedef void (MacroAssembler::* mem_float_insn)(FloatRegister Rt, const Address &adr);
 typedef void (MacroAssembler::* mem_vector_insn)(FloatRegister Rt,
                                   MacroAssembler::SIMD_RegVariant T, const Address &adr);
@@ -6924,7 +6925,7 @@ instruct loadRange(iRegINoSp dst, memory mem)
 instruct loadP(iRegPNoSp dst, memory mem)
 %{
   match(Set dst (LoadP mem));
-  predicate(!needs_acquiring_load(n));
+  predicate(!needs_acquiring_load(n) ZGC_ONLY( && (n->as_Load()->barrier_data() == 0) ));
 
   ins_cost(4 * INSN_COST);
   format %{ "ldr  $dst, $mem\t# ptr" %}
@@ -7617,6 +7618,7 @@ instruct loadL_volatile(iRegLNoSp dst, /* sync_memory*/indirect mem)
 instruct loadP_volatile(iRegPNoSp dst, /* sync_memory*/indirect mem)
 %{
   match(Set dst (LoadP mem));
+  predicate(true ZGC_ONLY( && n->as_Load()->barrier_data() == 0 ));
 
   ins_cost(VOLATILE_REF_COST);
   format %{ "ldar  $dst, $mem\t# ptr" %}
@@ -8501,6 +8503,7 @@ instruct compareAndSwapL(iRegINoSp res, indirect mem, iRegLNoSp oldval, iRegLNoS
 instruct compareAndSwapP(iRegINoSp res, indirect mem, iRegP oldval, iRegP newval, rFlagsReg cr) %{
 
   match(Set res (CompareAndSwapP mem (Binary oldval newval)));
+  predicate(true ZGC_ONLY( && n->as_LoadStore()->barrier_data() == 0 ));
   ins_cost(2 * VOLATILE_REF_COST);
 
   effect(KILL cr);
@@ -8614,7 +8617,7 @@ instruct compareAndSwapLAcq(iRegINoSp res, indirect mem, iRegLNoSp oldval, iRegL
 
 instruct compareAndSwapPAcq(iRegINoSp res, indirect mem, iRegP oldval, iRegP newval, rFlagsReg cr) %{
 
-  predicate(needs_acquiring_load_exclusive(n));
+  predicate(needs_acquiring_load_exclusive(n) ZGC_ONLY( && (n->as_LoadStore()->barrier_data() == 0) ));
   match(Set res (CompareAndSwapP mem (Binary oldval newval)));
   ins_cost(VOLATILE_REF_COST);
 
@@ -8745,6 +8748,7 @@ instruct compareAndExchangeN(iRegNNoSp res, indirect mem, iRegN oldval, iRegN ne
 %}
 
 instruct compareAndExchangeP(iRegPNoSp res, indirect mem, iRegP oldval, iRegP newval, rFlagsReg cr) %{
+  predicate(true ZGC_ONLY( && n->as_LoadStore()->barrier_data() == 0) );
   match(Set res (CompareAndExchangeP mem (Binary oldval newval)));
   ins_cost(2 * VOLATILE_REF_COST);
   effect(TEMP_DEF res, KILL cr);
@@ -8844,7 +8848,7 @@ instruct compareAndExchangeNAcq(iRegNNoSp res, indirect mem, iRegN oldval, iRegN
 %}
 
 instruct compareAndExchangePAcq(iRegPNoSp res, indirect mem, iRegP oldval, iRegP newval, rFlagsReg cr) %{
-  predicate(needs_acquiring_load_exclusive(n));
+  predicate(needs_acquiring_load_exclusive(n) ZGC_ONLY( && (n->as_LoadStore()->barrier_data() == 0) ));
   match(Set res (CompareAndExchangeP mem (Binary oldval newval)));
   ins_cost(VOLATILE_REF_COST);
   effect(TEMP_DEF res, KILL cr);
@@ -8945,6 +8949,7 @@ instruct weakCompareAndSwapN(iRegINoSp res, indirect mem, iRegN oldval, iRegN ne
 %}
 
 instruct weakCompareAndSwapP(iRegINoSp res, indirect mem, iRegP oldval, iRegP newval, rFlagsReg cr) %{
+  predicate(true ZGC_ONLY( && n->as_LoadStore()->barrier_data() == 0) );
   match(Set res (WeakCompareAndSwapP mem (Binary oldval newval)));
   ins_cost(2 * VOLATILE_REF_COST);
   effect(KILL cr);
@@ -9052,7 +9057,7 @@ instruct weakCompareAndSwapNAcq(iRegINoSp res, indirect mem, iRegN oldval, iRegN
 %}
 
 instruct weakCompareAndSwapPAcq(iRegINoSp res, indirect mem, iRegP oldval, iRegP newval, rFlagsReg cr) %{
-  predicate(needs_acquiring_load_exclusive(n));
+  predicate(needs_acquiring_load_exclusive(n) ZGC_ONLY( && (n->as_LoadStore()->barrier_data() == 0) ));
   match(Set res (WeakCompareAndSwapP mem (Binary oldval newval)));
   ins_cost(VOLATILE_REF_COST);
   effect(KILL cr);
@@ -9103,6 +9108,7 @@ instruct get_and_setN(indirect mem, iRegN newv, iRegINoSp prev) %{
 %}
 
 instruct get_and_setP(indirect mem, iRegP newv, iRegPNoSp prev) %{
+  predicate(true ZGC_ONLY( && n->as_LoadStore()->barrier_data() == 0) );
   match(Set prev (GetAndSetP mem newv));
   ins_cost(2 * VOLATILE_REF_COST);
   format %{ "atomic_xchg  $prev, $newv, [$mem]" %}
@@ -9146,7 +9152,7 @@ instruct get_and_setNAcq(indirect mem, iRegN newv, iRegINoSp prev) %{
 %}
 
 instruct get_and_setPAcq(indirect mem, iRegP newv, iRegPNoSp prev) %{
-  predicate(needs_acquiring_load_exclusive(n));
+  predicate(needs_acquiring_load_exclusive(n) ZGC_ONLY( && (n->as_LoadStore()->barrier_data() == 0) ));
   match(Set prev (GetAndSetP mem newv));
   ins_cost(VOLATILE_REF_COST);
   format %{ "atomic_xchg_acq  $prev, $newv, [$mem]" %}
